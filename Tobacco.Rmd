@@ -1,0 +1,87 @@
+---
+title: "Young American Tobacco Usage"
+author: "Vladyslav Shuvalov"
+date: "September 24, 2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(lme4)
+library(visreg)
+```
+
+## Introduction
+
+```{r, echo = FALSE}
+load("smoke.RData")
+```
+Tobacco is consumed in several forms sometimes with the help different tools. Using the 2014 American National Youth Tobacco Survey this report will examine whether regular use of chewing tobacco, snuff or dip is no more common amongst Americans of European ancestry than for Hispanic-Americans and African-Americans, once one accounts for the fact that white Americans more likely to live in rural areas and chewing tobacco is a rural phenomenon. In this report a regular user of chewing tobacco is someone that has consumed chewing tobbacco 6 or more times in the past month. The report will also examine whether the likelihood of having used a hookah or waterpipe on at least one occasion is the same for two individuals of the different sexes, provided their age, ethnicity, and other demographic characteristics are similar.
+
+## Methods
+
+Since the hypothesis is testing whether the likelihood of having used a hookah or waterpipe on at least one occasion is the same for two individuals of the different sexes the binomial regression with the count of 1 was chosen to fit the categorical data.
+
+From the smoking dataset the covariates: use of chewing tobacco or snuff, age, race, sex, and demographic were chosen to test the hypothesis.
+
+```{r hookah, echo = FALSE, fig.align="center", fig.cap="Summary of Hookah Data"}
+hookah = na.omit(smoke[, c("Race", "Age", "Sex", "RuralUrban", "ever_tobacco_hookah_or_wa")])
+summary(hookah)
+```
+
+Fitting a Binomial generalized linear model to the data with a logit link $log(\frac{p}{1-p}) = \beta_0 + \beta_1X_1 + I_{Urban}\beta_2X_2 + I_{Sex}\beta_3X_3 + I_{Hispanic}\beta4X_4 + I_{Black}\beta_5X_5$
+```{r, echo = FALSE, fig.cap="Summary of Coefficients of Binomial Regression on Hookah Data "}
+glm_hookah = glm(as.factor(ever_tobacco_hookah_or_wa) ~ Age + RuralUrban + Sex + Race, family=binomial(link = logit), data=hookah)
+knitr::kable(summary(glm_hookah)$coef, digits = 3)
+```
+
+In the figure a 95% CI for the influence of being female on the chance of a person trying a hookah over a male is (-0.0469, 0.125) or on the natural scale ($\frac{e^(-0.0469)}{1+e^(-0.0469)} = 0.488, \frac{e^(0.125)}{1+e^(0.125)} = 0.5312094$). 0 is in the confidence interval of $\beta_3$ therefore there is not enough evidence to suggest that there is a difference in likelihood of having used a hookah or waterpipe on at least one occasion between two induviduals of the different sexes at the 95% confidence level. 
+
+Since the hypothesis is testing Regular use of chewing tobacco, snuff or dip is no more common amongst Americans of European ancestry than for Hispanic-Americans and African-Americans the binomial regression with the count of 1 was chosen to fit the categorical data. 
+
+From the smoking dataset the covariates: Age, Race, Rural or Urban, and number of days used chewing tobacco out of the past 30. The dataset then filtered out those living in a rural community since there is a known bias of white Americans more likely to live in rural areas and chewing tobacco is a rural phenomenon. A column designating regular users was added. 
+
+```{r, echo = FALSE, fig.cap="SUmmary of Chewing Tobacco Data"}
+chew = na.omit(smoke[, c("Race", "Age", "RuralUrban", "chewing_tobacco_snuff_or", "days_use_chew_tobacco_snu")]) #
+chew$Regular = 0
+chew$Regular <- ifelse(chew$days_use_chew_tobacco_snu >= 3, "TRUE", "FALSE")
+chew = chew %>% filter(chew$RuralUrban == "Urban")
+summary(chew)
+```
+
+Fitting a Binomial generalized linear model to the data with a logit link $log(\frac{p}{1-p}) = \beta_0 + \beta_1X_1 + I_{Hispanic}\beta2X_2 + I_{Black}\beta_3X_3$
+
+```{r, echo = FALSE, }
+glm_chew = glm(as.factor(Regular) ~ Race + Age, family=binomial(), data=chew)
+knitr::kable(summary(glm_chew)$coef, digits = 3)
+```
+
+In the figure a 95% CI for the influence of being African-American person on the chance of being a regular chewing tobacco user over a European-American person is (-1.584, -0.420) or on the natural scale ($\frac{e^(-1.584)}{1+e^(-1.584)} = 0.170, \frac{e^(-0.420)}{1+e^(-0.420)} = 0.396$). While the influence of being Hispanic-American person on the chance of being a regular chewing tobacco user over a European-American person is (-0.765, -0.021) or on the natural scale ($\frac{e^(-0.765)}{1+e^(-0.765)} = 0.317, \frac{e^(-0.021)}{1+e^(-0.021)} = 0.494$). There is evidence to suggest that European-Americans are more likely to regularily consume chewing tobbacco than both African-Americans and Hispanic-Americans.
+
+####Summary
+
+In conclusion when accounting for age, ethnicity, and other demographic charactaristics there is not enough statistical evidence to conclude that there is a difference in likelihood of having used a hookah or waterpipe on at least one occasion is the same for two individuals of the different sexes. 
+
+The regression plot below shows a very similar trend among both sexes across all recorded ages. 
+
+```{r, echo=FALSE, fig.height = 3}
+visreg(glm_hookah, scale="response", "Age", 'Sex', gg=TRUE,xlab = "Age", ylab = "P(Hookah or Waterpipe User)")+
+  labs(title = "Plot of Predicted Hookah or Waterpipe Use",
+       subtitle = "Predicted probability of ever used hookah or waterpipe, binomial regression on smoking data")
+
+```
+
+While European-Americans are more likely to regularily consume chewing tobbacco than both African-Americans and Hispanic-Americans when accounting for demographic bias. 
+
+The regression plot below shows different trends for the three cultural groups. The difference becomes more prominent with age. 
+
+```{r, echo=FALSE, fig.height = 3}
+visreg(glm_chew, scale="response", "Age", 'Race', gg=TRUE, xlab = "Age", ylab = "P(Regular Chewing Tobacco User)", cex.lab=1.5)+
+  labs(title = "Plot of Predicted Regular Tobacco Use",
+       subtitle = "Predicted probability of being a regular chewing tobacco user by cultural group, binomial regression on smoking data")
+```
+
